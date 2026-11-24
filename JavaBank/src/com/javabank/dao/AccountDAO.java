@@ -4,8 +4,6 @@ import com.javabank.exception.DatabaseException;
 import com.javabank.model.Account;
 import com.javabank.model.AccountStatus;
 import com.javabank.model.AccountType;
-import com.javabank.model.CurrentAccount;
-import com.javabank.model.SavingsAccount;
 import com.javabank.util.DBConnection;
 
 import java.sql.Connection;
@@ -13,7 +11,6 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.sql.Timestamp;
 import java.util.ArrayList;
 
 public class AccountDAO {
@@ -58,11 +55,35 @@ public class AccountDAO {
     }
 
     public ArrayList<Account> findByCustomer(int customerId) throws DatabaseException {
-        return runListQuery("SELECT * FROM accounts WHERE customer_id = ? ORDER BY acc_no", customerId);
+        ArrayList<Account> list = new ArrayList<>();
+        String sql = "SELECT * FROM accounts WHERE customer_id = ? ORDER BY acc_no";
+        try (Connection con = DBConnection.getConnection();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setInt(1, customerId);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    list.add(mapRow(rs));
+                }
+            }
+            return list;
+        } catch (SQLException e) {
+            throw new DatabaseException("Could not read accounts: " + e.getMessage(), e);
+        }
     }
 
     public ArrayList<Account> findAll() throws DatabaseException {
-        return runListQuery("SELECT * FROM accounts ORDER BY acc_no", null);
+        ArrayList<Account> list = new ArrayList<>();
+        String sql = "SELECT * FROM accounts ORDER BY acc_no";
+        try (Connection con = DBConnection.getConnection();
+             PreparedStatement ps = con.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                list.add(mapRow(rs));
+            }
+            return list;
+        } catch (SQLException e) {
+            throw new DatabaseException("Could not read accounts: " + e.getMessage(), e);
+        }
     }
 
     public ArrayList<Account> findByType(AccountType type) throws DatabaseException {
@@ -133,37 +154,13 @@ public class AccountDAO {
         }
     }
 
-    // shared by findByCustomer and findAll (param is null when there is nothing to bind)
-    private ArrayList<Account> runListQuery(String sql, Integer param) throws DatabaseException {
-        ArrayList<Account> list = new ArrayList<>();
-        try (Connection con = DBConnection.getConnection();
-             PreparedStatement ps = con.prepareStatement(sql)) {
-            if (param != null) {
-                ps.setInt(1, param);
-            }
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) {
-                    list.add(mapRow(rs));
-                }
-            }
-            return list;
-        } catch (SQLException e) {
-            throw new DatabaseException("Could not read accounts: " + e.getMessage(), e);
-        }
-    }
-
-    // builds the right kind of Account object depending on the acc_type column
     private Account mapRow(ResultSet rs) throws SQLException {
-        int accNo = rs.getInt("acc_no");
-        int customerId = rs.getInt("customer_id");
-        double balance = rs.getDouble("balance");
-        AccountStatus status = AccountStatus.valueOf(rs.getString("status"));
-        Timestamp openedOn = rs.getTimestamp("opened_on");
-        AccountType type = AccountType.valueOf(rs.getString("acc_type"));
-
-        if (type == AccountType.SAVINGS) {
-            return new SavingsAccount(accNo, customerId, balance, status, openedOn);
-        }
-        return new CurrentAccount(accNo, customerId, balance, status, openedOn);
+        return new Account(
+                rs.getInt("acc_no"),
+                rs.getInt("customer_id"),
+                AccountType.valueOf(rs.getString("acc_type")),
+                rs.getDouble("balance"),
+                AccountStatus.valueOf(rs.getString("status")),
+                rs.getTimestamp("opened_on"));
     }
 }

@@ -1,11 +1,9 @@
 package com.javabank;
 
 import com.javabank.ui.MainMenu;
-import com.javabank.util.ConsoleUtil;
+import com.javabank.util.ConsoleUtil;//custom static method, so thats why no object creation
 import com.javabank.util.DBConnection;
-
 public class BankApp {
-
     public static void main(String[] args) {
         ConsoleUtil.banner();
 
@@ -17,6 +15,7 @@ public class BankApp {
         }
 
         new MainMenu().start();
-        System.out.println("\nThank you for banking with Java Bank. Goodbye!");
+        System.out.println("\nThank you for banking with our Bank. Goodbye!");
     }
 }
+

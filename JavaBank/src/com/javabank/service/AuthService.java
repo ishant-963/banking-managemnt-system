@@ -2,16 +2,13 @@ package com.javabank.service;
 
 import com.javabank.dao.AccountDAO;
 import com.javabank.dao.AdminDAO;
-import com.javabank.exception.AccountNotFoundException;
-import com.javabank.exception.AuthenticationException;
 import com.javabank.exception.BankException;
 import com.javabank.model.Account;
 import com.javabank.model.AccountStatus;
 import com.javabank.model.Admin;
-import com.javabank.util.PinHasher;
 import com.javabank.util.Validator;
 
-import java.util.HashMap;
+import java.util.ArrayList;
 
 public class AuthService {
 
@@ -20,38 +17,51 @@ public class AuthService {
     private AccountDAO accountDAO = new AccountDAO();
     private AdminDAO adminDAO = new AdminDAO();
 
-    // account number -> number of wrong PIN attempts so far
-    private HashMap<Integer, Integer> failedAttempts = new HashMap<>();
+    // tracks wrong PIN attempts using simple parallel lists
+    private ArrayList<Integer> failedAccNos = new ArrayList<>();
+    private ArrayList<Integer> failedCounts = new ArrayList<>();
 
     public Account loginCustomer(int accNo, String pin) throws BankException {
-        int failures = failedAttempts.getOrDefault(accNo, 0);
+        int index = failedAccNos.indexOf(accNo);
+        int failures = 0;
+        if (index != -1) {
+            failures = failedCounts.get(index);
+        }
         if (failures >= MAX_ATTEMPTS) {
-            throw new AuthenticationException("Too many wrong PIN attempts. This account is locked until the program restarts.");
+            throw new BankException("Too many wrong PIN attempts. This account is locked until the program restarts.");
         }
 
         Account account = accountDAO.findByAccNo(accNo);
         if (account == null) {
-            throw new AccountNotFoundException(accNo);
+            throw BankException.accountNotFound(accNo);
         }
         if (account.getStatus() == AccountStatus.CLOSED) {
-            throw new AuthenticationException("This account has been closed.");
+            throw new BankException("This account has been closed.");
         }
 
         String storedHash = accountDAO.getPinHash(accNo);
-        if (!PinHasher.hash(pin).equals(storedHash)) {
-            failedAttempts.put(accNo, failures + 1);
+        if (!Validator.hashPin(pin).equals(storedHash)) {
+            if (index == -1) {
+                failedAccNos.add(accNo);
+                failedCounts.add(1);
+            } else {
+                failedCounts.set(index, failures + 1);
+            }
             int left = MAX_ATTEMPTS - failures - 1;
-            throw new AuthenticationException("Incorrect PIN. Attempts left: " + left);
+            throw new BankException("Incorrect PIN. Attempts left: " + left);
         }
 
-        failedAttempts.remove(accNo);
+        if (index != -1) {
+            failedAccNos.remove(index);
+            failedCounts.remove(index);
+        }
         return account;
     }
 
     public Admin loginAdmin(String username, String password) throws BankException {
-        Admin admin = adminDAO.findByCredentials(username, PinHasher.hash(password));
+        Admin admin = adminDAO.findByCredentials(username, Validator.hashPin(password));
         if (admin == null) {
-            throw new AuthenticationException("Wrong admin username or password.");
+            throw new BankException("Wrong admin username or password.");
         }
         return admin;
     }
@@ -59,10 +69,10 @@ public class AuthService {
     public void changePin(int accNo, String oldPin, String newPin) throws BankException {
         String storedHash = accountDAO.getPinHash(accNo);
         if (storedHash == null) {
-            throw new AccountNotFoundException(accNo);
+            throw BankException.accountNotFound(accNo);
         }
-        if (!PinHasher.hash(oldPin).equals(storedHash)) {
-            throw new AuthenticationException("Your current PIN is incorrect.");
+        if (!Validator.hashPin(oldPin).equals(storedHash)) {
+            throw new BankException("Your current PIN is incorrect.");
         }
         if (!Validator.isValidPin(newPin)) {
             throw new BankException("The new PIN must be exactly 4 digits.");
@@ -70,6 +80,6 @@ public class AuthService {
         if (oldPin.equals(newPin)) {
             throw new BankException("The new PIN must be different from the old one.");
         }
-        accountDAO.updatePin(accNo, PinHasher.hash(newPin));
+        accountDAO.updatePin(accNo, Validator.hashPin(newPin));
     }
 }

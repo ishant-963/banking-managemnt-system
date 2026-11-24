@@ -36,8 +36,8 @@ public class TablePrinter {
         for (Account a : accounts) {
             sb.append(String.format("%-9d %-9d %-9s %-16s %-8s %-17s%n",
                     a.getAccNo(), a.getCustomerId(), a.getType(),
-                    MoneyFormatter.format(a.getBalance()), a.getStatus(),
-                    MoneyFormatter.date(a.getOpenedOn())));
+                    ConsoleUtil.formatMoney(a.getBalance()), a.getStatus(),
+                    ConsoleUtil.formatDate(a.getOpenedOn())));
         }
         return sb.toString();
     }
@@ -52,8 +52,8 @@ public class TablePrinter {
         sb.append("-".repeat(100)).append("\n");
         for (Transaction t : transactions) {
             sb.append(String.format("%-6d %-8d %-17s %-15s %-15s %-15s %s%n",
-                    t.getTxnId(), t.getAccNo(), MoneyFormatter.date(t.getTime()), t.getType(),
-                    MoneyFormatter.format(t.getAmount()), MoneyFormatter.format(t.getBalanceAfter()),
+                    t.getTxnId(), t.getAccNo(), ConsoleUtil.formatDate(t.getTime()), t.getType(),
+                    ConsoleUtil.formatMoney(t.getAmount()), ConsoleUtil.formatMoney(t.getBalanceAfter()),
                     t.getDescription()));
         }
         return sb.toString();
@@ -69,9 +69,9 @@ public class TablePrinter {
         sb.append("-".repeat(88)).append("\n");
         for (Loan l : loans) {
             sb.append(String.format("%-7d %-8d %-15s %-6s %-7d %-13s %-15s %-7s%n",
-                    l.getLoanId(), l.getAccNo(), MoneyFormatter.format(l.getPrincipal()),
-                    l.getAnnualRate() + "%", l.getMonths(), MoneyFormatter.format(l.getEmi()),
-                    MoneyFormatter.format(l.getRemaining()), l.getStatus()));
+                    l.getLoanId(), l.getAccNo(), ConsoleUtil.formatMoney(l.getPrincipal()),
+                    l.getAnnualRate() + "%", l.getMonths(), ConsoleUtil.formatMoney(l.getEmi()),
+                    ConsoleUtil.formatMoney(l.getRemaining()), l.getStatus()));
         }
         return sb.toString();
     }

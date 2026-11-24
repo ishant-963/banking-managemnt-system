@@ -6,8 +6,6 @@ import com.javabank.model.Loan;
 import com.javabank.service.AccountService;
 import com.javabank.service.LoanService;
 import com.javabank.util.ConsoleUtil;
-import com.javabank.util.InputHelper;
-import com.javabank.util.MoneyFormatter;
 import com.javabank.util.TablePrinter;
 
 public class LoanMenu {
@@ -30,7 +28,7 @@ public class LoanMenu {
             System.out.println("4. EMI calculator");
             System.out.println("0. Back");
 
-            int choice = InputHelper.readInt("\nEnter your choice: ");
+            int choice = ConsoleUtil.readInt("\nEnter your choice: ");
             switch (choice) {
                 case 1:
                     applyForLoan();
@@ -57,24 +55,24 @@ public class LoanMenu {
         try {
             account = accountService.getAccount(account.getAccNo());
             System.out.println("Interest rate : " + LoanService.ANNUAL_RATE + "% per year");
-            System.out.println("You can borrow: up to " + MoneyFormatter.format(loanService.getMaxLoanFor(account))
-                    + " (minimum " + MoneyFormatter.format(LoanService.MIN_LOAN) + ")");
+            System.out.println("You can borrow: up to " + ConsoleUtil.formatMoney(loanService.getMaxLoanFor(account))
+                    + " (minimum " + ConsoleUtil.formatMoney(LoanService.MIN_LOAN) + ")");
 
-            double principal = InputHelper.readDouble("Loan amount: ");
-            int months = InputHelper.readInt("Period in months (" + LoanService.MIN_MONTHS
+            double principal = ConsoleUtil.readDouble("Loan amount: ");
+            int months = ConsoleUtil.readInt("Period in months (" + LoanService.MIN_MONTHS
                     + " to " + LoanService.MAX_MONTHS + "): ");
 
             double emi = loanService.calculateEmi(principal, LoanService.ANNUAL_RATE, months);
-            System.out.println("Your monthly EMI would be " + MoneyFormatter.format(emi));
+            System.out.println("Your monthly EMI would be " + ConsoleUtil.formatMoney(emi));
 
-            if (!InputHelper.confirm("Take this loan?")) {
+            if (!ConsoleUtil.confirm("Take this loan?")) {
                 ConsoleUtil.info("Loan application cancelled.");
                 return;
             }
 
             Loan loan = loanService.applyForLoan(account.getAccNo(), principal, months);
             ConsoleUtil.success("Loan #" + loan.getLoanId() + " approved. "
-                    + MoneyFormatter.format(principal) + " has been added to your account.");
+                    + ConsoleUtil.formatMoney(principal) + " has been added to your account.");
         } catch (BankException e) {
             ConsoleUtil.error(e.getMessage());
         }
@@ -90,11 +88,11 @@ public class LoanMenu {
     }
 
     private void payEmi() {
-        int loanId = InputHelper.readInt("Loan number to pay: ");
+        int loanId = ConsoleUtil.readInt("Loan number to pay: ");
         try {
             Loan loan = loanService.payEmi(loanId, account.getAccNo());
             ConsoleUtil.success("EMI paid. Remaining on loan #" + loanId + ": "
-                    + MoneyFormatter.format(loan.getRemaining()));
+                    + ConsoleUtil.formatMoney(loan.getRemaining()));
             if (loan.getRemaining() <= 0) {
                 ConsoleUtil.success("Congratulations, this loan is now fully paid!");
             }
@@ -104,16 +102,16 @@ public class LoanMenu {
     }
 
     private void emiCalculator() {
-        double principal = InputHelper.readDouble("Loan amount: ");
-        int months = InputHelper.readInt("Period in months: ");
+        double principal = ConsoleUtil.readDouble("Loan amount: ");
+        int months = ConsoleUtil.readInt("Period in months: ");
         if (principal <= 0 || months <= 0) {
             ConsoleUtil.error("Amount and months must be greater than zero.");
             return;
         }
         double emi = loanService.calculateEmi(principal, LoanService.ANNUAL_RATE, months);
-        double total = MoneyFormatter.round(emi * months);
-        System.out.println("Monthly EMI    : " + MoneyFormatter.format(emi));
-        System.out.println("Total payable  : " + MoneyFormatter.format(total));
-        System.out.println("Total interest : " + MoneyFormatter.format(total - principal));
+        double total = ConsoleUtil.roundMoney(emi * months);
+        System.out.println("Monthly EMI    : " + ConsoleUtil.formatMoney(emi));
+        System.out.println("Total payable  : " + ConsoleUtil.formatMoney(total));
+        System.out.println("Total interest : " + ConsoleUtil.formatMoney(total - principal));
     }
 }

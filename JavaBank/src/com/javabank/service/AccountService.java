@@ -4,23 +4,18 @@ import com.javabank.dao.AccountDAO;
 import com.javabank.dao.CustomerDAO;
 import com.javabank.dao.LoanDAO;
 import com.javabank.dao.TransactionDAO;
-import com.javabank.exception.AccountNotFoundException;
 import com.javabank.exception.BankException;
 import com.javabank.exception.DatabaseException;
-import com.javabank.exception.InvalidAmountException;
 import com.javabank.model.Account;
 import com.javabank.model.AccountStatus;
 import com.javabank.model.AccountType;
-import com.javabank.model.CurrentAccount;
 import com.javabank.model.Customer;
 import com.javabank.model.Loan;
 import com.javabank.model.LoanStatus;
-import com.javabank.model.SavingsAccount;
 import com.javabank.model.Transaction;
 import com.javabank.model.TransactionType;
+import com.javabank.util.ConsoleUtil;
 import com.javabank.util.DBConnection;
-import com.javabank.util.MoneyFormatter;
-import com.javabank.util.PinHasher;
 import com.javabank.util.Validator;
 
 import java.sql.Connection;
@@ -66,9 +61,7 @@ public class AccountService {
     public Account openAccount(int customerId, AccountType type, String pin, double openingDeposit)
             throws BankException {
         validateNewAccount(type, pin, openingDeposit);
-        if (customerDAO.findById(customerId) == null) {
-            throw new BankException("Customer " + customerId + " was not found.");
-        }
+        getCustomer(customerId);
 
         Connection con = null;
         int accNo = -1;
@@ -94,7 +87,7 @@ public class AccountService {
     public Account getAccount(int accNo) throws BankException {
         Account account = accountDAO.findByAccNo(accNo);
         if (account == null) {
-            throw new AccountNotFoundException(accNo);
+            throw BankException.accountNotFound(accNo);
         }
         return account;
     }
@@ -112,7 +105,7 @@ public class AccountService {
         for (Account account : accountDAO.findByCustomer(customerId)) {
             total += account.getBalance();
         }
-        return MoneyFormatter.round(total);
+        return ConsoleUtil.roundMoney(total);
     }
 
     public void freezeAccount(int accNo) throws BankException {
@@ -138,9 +131,8 @@ public class AccountService {
         }
         if (Math.abs(account.getBalance()) >= 0.01) {
             throw new BankException("Balance must be exactly zero before closing. Current balance: "
-                    + MoneyFormatter.format(account.getBalance()));
+                    + ConsoleUtil.formatMoney(account.getBalance()));
         }
-        // an account with a running loan cannot be closed
         for (Loan loan : loanDAO.findByCustomer(account.getCustomerId())) {
             if (loan.getAccNo() == accNo && loan.getStatus() == LoanStatus.ACTIVE) {
                 throw new BankException("Account " + accNo + " still has an active loan (#" + loan.getLoanId() + ").");
@@ -149,11 +141,27 @@ public class AccountService {
         accountDAO.updateStatus(accNo, AccountStatus.CLOSED);
     }
 
+    public Customer getCustomer(int customerId) throws BankException {
+        Customer customer = customerDAO.findById(customerId);
+        if (customer == null) {
+            throw new BankException("Customer " + customerId + " was not found.");
+        }
+        return customer;
+    }
+
+    public ArrayList<Customer> getAllCustomers() throws BankException {
+        return customerDAO.findAll();
+    }
+
+    public void updateContact(int customerId, String phone, String email, String address) throws BankException {
+        validateContact(phone, email, address);
+        customerDAO.updateContact(customerId, phone, email, address);
+    }
+
     private int createAccountRows(Connection con, int customerId, AccountType type, String pin, double opening)
             throws BankException {
-        int accNo = accountDAO.insert(con, customerId, type, PinHasher.hash(pin), opening);
-        Transaction openingTxn = new Transaction(accNo, TransactionType.DEPOSIT, opening, opening, "Opening deposit");
-        transactionDAO.insert(con, openingTxn);
+        int accNo = accountDAO.insert(con, customerId, type, Validator.hashPin(pin), opening);
+        transactionDAO.insert(con, new Transaction(accNo, TransactionType.DEPOSIT, opening, opening, "Opening deposit"));
         return accNo;
     }
 
@@ -161,13 +169,17 @@ public class AccountService {
         if (!Validator.isValidName(c.getName())) {
             throw new BankException("Name must have only letters and spaces (2 to 50 characters).");
         }
-        if (!Validator.isValidPhone(c.getPhone())) {
+        validateContact(c.getPhone(), c.getEmail(), c.getAddress());
+    }
+
+    private void validateContact(String phone, String email, String address) throws BankException {
+        if (!Validator.isValidPhone(phone)) {
             throw new BankException("Phone must be a valid 10 digit mobile number.");
         }
-        if (!Validator.isValidEmail(c.getEmail())) {
+        if (!Validator.isValidEmail(email)) {
             throw new BankException("That email address does not look right.");
         }
-        if (!Validator.isValidAddress(c.getAddress())) {
+        if (!Validator.isValidAddress(address)) {
             throw new BankException("Address must be between 5 and 120 characters.");
         }
     }
@@ -176,17 +188,10 @@ public class AccountService {
         if (!Validator.isValidPin(pin)) {
             throw new BankException("PIN must be exactly 4 digits.");
         }
-        double minimum = getMinimumOpeningDeposit(type);
+        double minimum = Account.getMinimumOpeningDeposit(type);
         if (!Validator.isValidAmount(openingDeposit) || openingDeposit < minimum) {
-            throw new InvalidAmountException("Minimum opening deposit for a " + type + " account is "
-                    + MoneyFormatter.format(minimum) + ".");
+            throw new BankException("Minimum opening deposit for a " + type + " account is "
+                    + ConsoleUtil.formatMoney(minimum) + ".");
         }
-    }
-
-    public double getMinimumOpeningDeposit(AccountType type) {
-        if (type == AccountType.SAVINGS) {
-            return SavingsAccount.MIN_BALANCE;
-        }
-        return CurrentAccount.MIN_OPENING_DEPOSIT;
     }
 }

@@ -8,7 +8,6 @@ import com.javabank.model.Customer;
 import com.javabank.service.AccountService;
 import com.javabank.service.AuthService;
 import com.javabank.util.ConsoleUtil;
-import com.javabank.util.InputHelper;
 import com.javabank.util.Validator;
 
 public class MainMenu {
@@ -25,7 +24,7 @@ public class MainMenu {
             System.out.println("3. Admin login");
             System.out.println("0. Exit");
 
-            int choice = InputHelper.readInt("\nEnter your choice: ");
+            int choice = ConsoleUtil.readInt("\nEnter your choice: ");
             switch (choice) {
                 case 1:
                     registerNewCustomer();
@@ -48,34 +47,34 @@ public class MainMenu {
     private void registerNewCustomer() {
         ConsoleUtil.header("NEW CUSTOMER REGISTRATION");
 
-        String name = InputHelper.readLine("Full name: ");
+        String name = ConsoleUtil.readLine("Full name: ");
         while (!Validator.isValidName(name)) {
             ConsoleUtil.error("Name must have only letters and spaces (2 to 50 characters).");
-            name = InputHelper.readLine("Full name: ");
+            name = ConsoleUtil.readLine("Full name: ");
         }
 
-        String phone = InputHelper.readLine("Mobile number (10 digits): ");
+        String phone = ConsoleUtil.readLine("Mobile number (10 digits): ");
         while (!Validator.isValidPhone(phone)) {
             ConsoleUtil.error("Enter a valid 10 digit mobile number.");
-            phone = InputHelper.readLine("Mobile number (10 digits): ");
+            phone = ConsoleUtil.readLine("Mobile number (10 digits): ");
         }
 
-        String email = InputHelper.readLine("Email: ");
+        String email = ConsoleUtil.readLine("Email: ");
         while (!Validator.isValidEmail(email)) {
             ConsoleUtil.error("That email address does not look right.");
-            email = InputHelper.readLine("Email: ");
+            email = ConsoleUtil.readLine("Email: ");
         }
 
-        String address = InputHelper.readLine("Address: ");
+        String address = ConsoleUtil.readLine("Address: ");
         while (!Validator.isValidAddress(address)) {
             ConsoleUtil.error("Address must be between 5 and 120 characters.");
-            address = InputHelper.readLine("Address: ");
+            address = ConsoleUtil.readLine("Address: ");
         }
 
         System.out.println();
-        AccountType type = AccountForm.askAccountType();
-        String pin = AccountForm.askNewPin();
-        double opening = AccountForm.askOpeningDeposit(type, accountService);
+        AccountType type = askAccountType();
+        String pin = askNewPin();
+        double opening = askOpeningDeposit(type);
 
         try {
             Customer customer = new Customer(name, phone, email, address);
@@ -90,8 +89,8 @@ public class MainMenu {
 
     private void customerLogin() {
         ConsoleUtil.header("CUSTOMER LOGIN");
-        int accNo = InputHelper.readInt("Account number: ");
-        String pin = InputHelper.readLine("PIN: ");
+        int accNo = ConsoleUtil.readInt("Account number: ");
+        String pin = ConsoleUtil.readLine("PIN: ");
 
         try {
             Account account = authService.loginCustomer(accNo, pin);
@@ -103,14 +102,54 @@ public class MainMenu {
 
     private void adminLogin() {
         ConsoleUtil.header("ADMIN LOGIN");
-        String username = InputHelper.readLine("Username: ");
-        String password = InputHelper.readLine("Password: ");
+        String username = ConsoleUtil.readLine("Username: ");
+        String password = ConsoleUtil.readLine("Password: ");
 
         try {
             Admin admin = authService.loginAdmin(username, password);
             new AdminMenu(admin).show();
         } catch (BankException e) {
             ConsoleUtil.error(e.getMessage());
+        }
+    }
+
+    static AccountType askAccountType() {
+        while (true) {
+            System.out.println("Account type:");
+            System.out.println("  1. Savings  (4% interest, minimum balance Rs. 500)");
+            System.out.println("  2. Current  (overdraft up to Rs. 10,000, no interest)");
+            int choice = ConsoleUtil.readInt("Choose 1 or 2: ");
+            if (choice == 1) return AccountType.SAVINGS;
+            if (choice == 2) return AccountType.CURRENT;
+            ConsoleUtil.error("Please choose 1 or 2.");
+        }
+    }
+
+    static String askNewPin() {
+        while (true) {
+            String pin = ConsoleUtil.readLine("Choose a 4-digit PIN: ");
+            if (!Validator.isValidPin(pin)) {
+                ConsoleUtil.error("PIN must be exactly 4 digits.");
+                continue;
+            }
+            String again = ConsoleUtil.readLine("Re-enter the PIN: ");
+            if (!pin.equals(again)) {
+                ConsoleUtil.error("The PINs did not match, try again.");
+                continue;
+            }
+            return pin;
+        }
+    }
+
+    static double askOpeningDeposit(AccountType type) {
+        double minimum = Account.getMinimumOpeningDeposit(type);
+        while (true) {
+            double amount = ConsoleUtil.readDouble("Opening deposit (minimum "
+                    + ConsoleUtil.formatMoney(minimum) + "): ");
+            if (amount >= minimum && Validator.isValidAmount(amount)) {
+                return amount;
+            }
+            ConsoleUtil.error("Opening deposit must be at least " + ConsoleUtil.formatMoney(minimum) + ".");
         }
     }
 }

@@ -1,5 +1,9 @@
 package com.javabank.util;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+
 public class Validator {
 
     public static boolean isValidName(String name) {
@@ -27,5 +31,20 @@ public class Validator {
     // at least one paisa, and not something silly like NaN or infinity
     public static boolean isValidAmount(double amount) {
         return amount >= 0.01 && amount < 1.0E12;
+    }
+
+    // PINs and passwords are never stored as plain text, only their SHA-256 hash.
+    public static String hashPin(String text) {
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            byte[] bytes = md.digest(text.getBytes(StandardCharsets.UTF_8));
+            StringBuilder sb = new StringBuilder();
+            for (byte b : bytes) {
+                sb.append(String.format("%02x", b));
+            }
+            return sb.toString();
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException("SHA-256 is not available on this machine", e);
+        }
     }
 }

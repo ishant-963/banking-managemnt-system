@@ -40,46 +40,32 @@ public class LoanDAO {
     }
 
     public Loan findById(int loanId) throws DatabaseException {
-        String sql = "SELECT * FROM loans WHERE loan_id = ?";
-        try (Connection con = DBConnection.getConnection();
-             PreparedStatement ps = con.prepareStatement(sql)) {
-            ps.setInt(1, loanId);
-            try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) {
-                    return mapRow(rs);
-                }
-            }
+        ArrayList<Loan> results = runListQuery("SELECT * FROM loans WHERE loan_id = ?", loanId);
+        if (results.isEmpty()) {
             return null;
-        } catch (SQLException e) {
-            throw new DatabaseException("Could not read loan: " + e.getMessage(), e);
         }
+        return results.get(0);
     }
 
     public ArrayList<Loan> findByCustomer(int customerId) throws DatabaseException {
-        String sql = "SELECT * FROM loans WHERE customer_id = ? ORDER BY loan_id";
+        return runListQuery("SELECT * FROM loans WHERE customer_id = ? ORDER BY loan_id", customerId);
+    }
+
+    public ArrayList<Loan> findAll() throws DatabaseException {
+        return runListQuery("SELECT * FROM loans ORDER BY loan_id", null);
+    }
+
+    private ArrayList<Loan> runListQuery(String sql, Integer param) throws DatabaseException {
         ArrayList<Loan> list = new ArrayList<>();
         try (Connection con = DBConnection.getConnection();
              PreparedStatement ps = con.prepareStatement(sql)) {
-            ps.setInt(1, customerId);
+            if (param != null) {
+                ps.setInt(1, param);
+            }
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
                     list.add(mapRow(rs));
                 }
-            }
-            return list;
-        } catch (SQLException e) {
-            throw new DatabaseException("Could not read loans: " + e.getMessage(), e);
-        }
-    }
-
-    public ArrayList<Loan> findAll() throws DatabaseException {
-        String sql = "SELECT * FROM loans ORDER BY loan_id";
-        ArrayList<Loan> list = new ArrayList<>();
-        try (Connection con = DBConnection.getConnection();
-             PreparedStatement ps = con.prepareStatement(sql);
-             ResultSet rs = ps.executeQuery()) {
-            while (rs.next()) {
-                list.add(mapRow(rs));
             }
             return list;
         } catch (SQLException e) {

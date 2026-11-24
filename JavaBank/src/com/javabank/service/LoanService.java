@@ -2,16 +2,14 @@ package com.javabank.service;
 
 import com.javabank.dao.AccountDAO;
 import com.javabank.dao.LoanDAO;
-import com.javabank.exception.AccountNotFoundException;
 import com.javabank.exception.BankException;
 import com.javabank.exception.DatabaseException;
-import com.javabank.exception.InvalidAmountException;
 import com.javabank.model.Account;
 import com.javabank.model.Loan;
 import com.javabank.model.LoanStatus;
 import com.javabank.model.TransactionType;
+import com.javabank.util.ConsoleUtil;
 import com.javabank.util.DBConnection;
-import com.javabank.util.MoneyFormatter;
 
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -35,30 +33,30 @@ public class LoanService {
         double monthlyRate = annualRate / 12 / 100;
         double growth = Math.pow(1 + monthlyRate, months);
         double emi = principal * monthlyRate * growth / (growth - 1);
-        return MoneyFormatter.round(emi);
+        return ConsoleUtil.roundMoney(emi);
     }
 
     public double getMaxLoanFor(Account account) {
-        return Math.max(0, MoneyFormatter.round(account.getBalance() * LOAN_LIMIT_MULTIPLE));
+        return Math.max(0, ConsoleUtil.roundMoney(account.getBalance() * LOAN_LIMIT_MULTIPLE));
     }
 
     public Loan applyForLoan(int accNo, double principal, int months) throws BankException {
         Account account = accountDAO.findByAccNo(accNo);
         if (account == null) {
-            throw new AccountNotFoundException(accNo);
+            throw BankException.accountNotFound(accNo);
         }
         if (!account.isActive()) {
             throw new BankException("Loans can only be given to active accounts.");
         }
         if (principal < MIN_LOAN) {
-            throw new InvalidAmountException("Minimum loan amount is " + MoneyFormatter.format(MIN_LOAN) + ".");
+            throw new BankException("Minimum loan amount is " + ConsoleUtil.formatMoney(MIN_LOAN) + ".");
         }
         if (months < MIN_MONTHS || months > MAX_MONTHS) {
             throw new BankException("Loan period must be between " + MIN_MONTHS + " and " + MAX_MONTHS + " months.");
         }
         if (principal > getMaxLoanFor(account)) {
             throw new BankException("Based on your balance you can borrow up to "
-                    + MoneyFormatter.format(getMaxLoanFor(account)) + ".");
+                    + ConsoleUtil.formatMoney(getMaxLoanFor(account)) + ".");
         }
         if (countActiveLoans(account.getCustomerId()) >= MAX_ACTIVE_LOANS) {
             throw new BankException("You already have " + MAX_ACTIVE_LOANS + " active loans. Please close one first.");
@@ -98,7 +96,7 @@ public class LoanService {
         }
         Account account = accountDAO.findByAccNo(accNo);
         if (account == null) {
-            throw new AccountNotFoundException(accNo);
+            throw BankException.accountNotFound(accNo);
         }
         if (loan.getCustomerId() != account.getCustomerId()) {
             throw new BankException("This loan does not belong to you.");
@@ -108,9 +106,10 @@ public class LoanService {
         }
 
         double payment = Math.min(loan.getEmi(), loan.getRemaining());
-        double newRemaining = MoneyFormatter.round(loan.getRemaining() - payment);
-        LoanStatus newStatus = newRemaining <= 0.01 ? LoanStatus.CLOSED : LoanStatus.ACTIVE;
-        if (newStatus == LoanStatus.CLOSED) {
+        double newRemaining = ConsoleUtil.roundMoney(loan.getRemaining() - payment);
+        LoanStatus newStatus = LoanStatus.ACTIVE;
+        if (newRemaining <= 0.01) {
+            newStatus = LoanStatus.CLOSED;
             newRemaining = 0;
         }
 

@@ -6,7 +6,6 @@ import java.sql.SQLException;
 
 public class DBConnection {
 
-    // ---- change these to match your own MySQL setup ----
     private static final String URL = "jdbc:mysql://localhost:3306/javabank_db"
             + "?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC";
     private static final String USER = "root";
@@ -48,3 +47,14 @@ public class DBConnection {
         }
     }
 }
+
+
+
+
+
+
+
+
+
+
+

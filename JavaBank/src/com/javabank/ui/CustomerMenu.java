@@ -6,13 +6,9 @@ import com.javabank.model.AccountType;
 import com.javabank.model.Customer;
 import com.javabank.service.AccountService;
 import com.javabank.service.AuthService;
-import com.javabank.service.CustomerService;
-import com.javabank.service.StatementService;
+import com.javabank.service.ReportService;
 import com.javabank.service.TransactionService;
-import com.javabank.service.TransferService;
 import com.javabank.util.ConsoleUtil;
-import com.javabank.util.InputHelper;
-import com.javabank.util.MoneyFormatter;
 import com.javabank.util.TablePrinter;
 
 public class CustomerMenu {
@@ -21,10 +17,8 @@ public class CustomerMenu {
     private AuthService authService;
 
     private AccountService accountService = new AccountService();
-    private CustomerService customerService = new CustomerService();
     private TransactionService transactionService = new TransactionService();
-    private TransferService transferService = new TransferService();
-    private StatementService statementService = new StatementService();
+    private ReportService reportService = new ReportService();
 
     public CustomerMenu(Account account, AuthService authService) {
         this.account = account;
@@ -33,7 +27,7 @@ public class CustomerMenu {
 
     public void show() {
         try {
-            Customer customer = customerService.getCustomer(account.getCustomerId());
+            Customer customer = accountService.getCustomer(account.getCustomerId());
             ConsoleUtil.success("Login successful. Welcome back, " + customer.getName() + "!");
         } catch (BankException e) {
             ConsoleUtil.success("Login successful.");
@@ -53,7 +47,7 @@ public class CustomerMenu {
             System.out.println("9. Profile and settings");
             System.out.println("0. Logout");
 
-            int choice = InputHelper.readInt("\nEnter your choice: ");
+            int choice = ConsoleUtil.readInt("\nEnter your choice: ");
             switch (choice) {
                 case 1:
                     checkBalance();
@@ -81,7 +75,7 @@ public class CustomerMenu {
                     refreshAccount();
                     break;
                 case 9:
-                    new ProfileMenu(account, authService).show();
+                    showProfileMenu();
                     break;
                 case 0:
                     ConsoleUtil.info("Logged out. See you again!");
@@ -96,51 +90,50 @@ public class CustomerMenu {
     private void checkBalance() {
         refreshAccount();
         System.out.println("Account status : " + account.getStatus());
-        System.out.println("Current balance: " + MoneyFormatter.format(account.getBalance()));
+        System.out.println("Current balance: " + ConsoleUtil.formatMoney(account.getBalance()));
         System.out.println(account.getRulesSummary());
     }
 
     private void deposit() {
-        double amount = InputHelper.readDouble("Amount to deposit: ");
+        double amount = ConsoleUtil.readDouble("Amount to deposit: ");
         try {
             account = transactionService.deposit(account.getAccNo(), amount);
-            ConsoleUtil.success("Deposited " + MoneyFormatter.format(amount)
-                    + ". New balance: " + MoneyFormatter.format(account.getBalance()));
+            ConsoleUtil.success("Deposited " + ConsoleUtil.formatMoney(amount)
+                    + ". New balance: " + ConsoleUtil.formatMoney(account.getBalance()));
         } catch (BankException e) {
             ConsoleUtil.error(e.getMessage());
         }
     }
 
     private void withdraw() {
-        double amount = InputHelper.readDouble("Amount to withdraw: ");
+        double amount = ConsoleUtil.readDouble("Amount to withdraw: ");
         try {
             account = transactionService.withdraw(account.getAccNo(), amount);
-            ConsoleUtil.success("Withdrew " + MoneyFormatter.format(amount)
-                    + ". New balance: " + MoneyFormatter.format(account.getBalance()));
+            ConsoleUtil.success("Withdrew " + ConsoleUtil.formatMoney(amount)
+                    + ". New balance: " + ConsoleUtil.formatMoney(account.getBalance()));
         } catch (BankException e) {
             ConsoleUtil.error(e.getMessage());
         }
     }
 
     private void transfer() {
-        int toAccNo = InputHelper.readInt("Receiver's account number: ");
+        int toAccNo = ConsoleUtil.readInt("Receiver's account number: ");
         try {
-            // show who is going to receive the money before asking for the amount
             Account receiver = accountService.getAccount(toAccNo);
-            Customer receiverOwner = customerService.getCustomer(receiver.getCustomerId());
+            Customer receiverOwner = accountService.getCustomer(receiver.getCustomerId());
             System.out.println("Receiver: " + receiverOwner.getName() + " (" + receiver.getType() + " account)");
 
-            double amount = InputHelper.readDouble("Amount to transfer: ");
-            String note = InputHelper.readLine("Note (optional): ");
+            double amount = ConsoleUtil.readDouble("Amount to transfer: ");
+            String note = ConsoleUtil.readLine("Note (optional): ");
 
-            if (!InputHelper.confirm("Send " + MoneyFormatter.format(amount) + " to " + receiverOwner.getName() + "?")) {
+            if (!ConsoleUtil.confirm("Send " + ConsoleUtil.formatMoney(amount) + " to " + receiverOwner.getName() + "?")) {
                 ConsoleUtil.info("Transfer cancelled.");
                 return;
             }
 
-            transferService.transfer(account.getAccNo(), toAccNo, amount, note);
+            transactionService.transfer(account.getAccNo(), toAccNo, amount, note);
             refreshAccount();
-            ConsoleUtil.success("Transfer complete. New balance: " + MoneyFormatter.format(account.getBalance()));
+            ConsoleUtil.success("Transfer complete. New balance: " + ConsoleUtil.formatMoney(account.getBalance()));
         } catch (BankException e) {
             ConsoleUtil.error(e.getMessage());
         }
@@ -157,7 +150,7 @@ public class CustomerMenu {
 
     private void fullStatement() {
         try {
-            System.out.println(statementService.generateStatement(account.getAccNo()));
+            System.out.println(reportService.generateStatement(account.getAccNo()));
             ConsoleUtil.pause();
         } catch (BankException e) {
             ConsoleUtil.error(e.getMessage());
@@ -166,13 +159,91 @@ public class CustomerMenu {
 
     private void openAnotherAccount() {
         ConsoleUtil.header("OPEN ANOTHER ACCOUNT");
-        AccountType type = AccountForm.askAccountType();
-        String pin = AccountForm.askNewPin();
-        double opening = AccountForm.askOpeningDeposit(type, accountService);
+        AccountType type = MainMenu.askAccountType();
+        String pin = MainMenu.askNewPin();
+        double opening = MainMenu.askOpeningDeposit(type);
 
         try {
             Account created = accountService.openAccount(account.getCustomerId(), type, pin, opening);
             ConsoleUtil.success("New " + type + " account opened. Account number: " + created.getAccNo());
+        } catch (BankException e) {
+            ConsoleUtil.error(e.getMessage());
+        }
+    }
+
+    private void showProfileMenu() {
+        boolean inMenu = true;
+        while (inMenu) {
+            ConsoleUtil.header("PROFILE AND SETTINGS");
+            System.out.println("1. View my profile and accounts");
+            System.out.println("2. Update contact details");
+            System.out.println("3. Change PIN");
+            System.out.println("0. Back");
+
+            int choice = ConsoleUtil.readInt("\nEnter your choice: ");
+            switch (choice) {
+                case 1:
+                    viewProfile();
+                    break;
+                case 2:
+                    updateContact();
+                    break;
+                case 3:
+                    changePin();
+                    break;
+                case 0:
+                    inMenu = false;
+                    break;
+                default:
+                    ConsoleUtil.error("Invalid choice, please try again.");
+            }
+        }
+    }
+
+    private void viewProfile() {
+        try {
+            Customer c = accountService.getCustomer(account.getCustomerId());
+            System.out.println("\nCustomer ID : " + c.getCustomerId());
+            System.out.println("Name        : " + c.getName());
+            System.out.println("Phone       : " + c.getPhone());
+            System.out.println("Email       : " + c.getEmail());
+            System.out.println("Address     : " + c.getAddress());
+
+            System.out.println("\nYour accounts:");
+            System.out.print(TablePrinter.accountTable(accountService.getAccountsOfCustomer(c.getCustomerId())));
+            System.out.println("Total across all accounts: "
+                    + ConsoleUtil.formatMoney(accountService.getTotalBalance(c.getCustomerId())));
+        } catch (BankException e) {
+            ConsoleUtil.error(e.getMessage());
+        }
+    }
+
+    private void updateContact() {
+        try {
+            Customer c = accountService.getCustomer(account.getCustomerId());
+            System.out.println("Leave a field empty to keep the current value.");
+
+            String phone = ConsoleUtil.readLine("Phone [" + c.getPhone() + "]: ");
+            String email = ConsoleUtil.readLine("Email [" + c.getEmail() + "]: ");
+            String address = ConsoleUtil.readLine("Address [" + c.getAddress() + "]: ");
+
+            if (phone.isEmpty()) phone = c.getPhone();
+            if (email.isEmpty()) email = c.getEmail();
+            if (address.isEmpty()) address = c.getAddress();
+
+            accountService.updateContact(c.getCustomerId(), phone, email, address);
+            ConsoleUtil.success("Contact details updated.");
+        } catch (BankException e) {
+            ConsoleUtil.error(e.getMessage());
+        }
+    }
+
+    private void changePin() {
+        String oldPin = ConsoleUtil.readLine("Current PIN: ");
+        String newPin = MainMenu.askNewPin();
+        try {
+            authService.changePin(account.getAccNo(), oldPin, newPin);
+            ConsoleUtil.success("PIN changed successfully.");
         } catch (BankException e) {
             ConsoleUtil.error(e.getMessage());
         }

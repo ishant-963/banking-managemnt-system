@@ -2,30 +2,63 @@ package com.javabank.model;
 
 import java.sql.Timestamp;
 
-// Base class for every kind of account. Savings and current accounts
-// differ in their withdrawal rules and in how they earn interest.
-public abstract class Account {
-    protected int accNo;
-    protected int customerId;
-    protected double balance;
-    protected AccountStatus status;
-    protected Timestamp openedOn;
+// Represents a bank account (SAVINGS or CURRENT) and its type-specific rules.
+public class Account {
 
-    public Account(int accNo, int customerId, double balance, AccountStatus status, Timestamp openedOn) {
+    public static final double SAVINGS_MIN_BALANCE = 500.0;
+    public static final double SAVINGS_INTEREST_RATE = 4.0;
+    public static final double CURRENT_OVERDRAFT_LIMIT = 10000.0;
+    public static final double CURRENT_MIN_OPENING_DEPOSIT = 1000.0;
+
+    private int accNo;
+    private int customerId;
+    private AccountType type;
+    private double balance;
+    private AccountStatus status;
+    private Timestamp openedOn;
+
+    public Account(int accNo, int customerId, AccountType type, double balance, AccountStatus status, Timestamp openedOn) {
         this.accNo = accNo;
         this.customerId = customerId;
+        this.type = type;
         this.balance = balance;
         this.status = status;
         this.openedOn = openedOn;
     }
 
-    public abstract AccountType getType();
+    public AccountType getType() {
+        return type;
+    }
 
-    public abstract boolean canWithdraw(double amount);
+    public boolean canWithdraw(double amount) {
+        if (type == AccountType.SAVINGS) {
+            return balance - amount >= SAVINGS_MIN_BALANCE;
+        }
+        return balance - amount >= -CURRENT_OVERDRAFT_LIMIT;
+    }
 
-    public abstract double calculateMonthlyInterest();
+    public double calculateMonthlyInterest() {
+        if (type != AccountType.SAVINGS) {
+            return 0.0;
+        }
+        double interest = balance * SAVINGS_INTEREST_RATE / 100 / 12;
+        return Math.round(interest * 100.0) / 100.0;
+    }
 
-    public abstract String getRulesSummary();
+    public String getRulesSummary() {
+        if (type == AccountType.SAVINGS) {
+            return "Savings rules: minimum balance Rs. " + (int) SAVINGS_MIN_BALANCE
+                    + ", interest " + SAVINGS_INTEREST_RATE + "% per year.";
+        }
+        return "Current rules: overdraft up to Rs. " + (int) CURRENT_OVERDRAFT_LIMIT + ", no interest.";
+    }
+
+    public static double getMinimumOpeningDeposit(AccountType type) {
+        if (type == AccountType.SAVINGS) {
+            return SAVINGS_MIN_BALANCE;
+        }
+        return CURRENT_MIN_OPENING_DEPOSIT;
+    }
 
     public boolean isActive() {
         return status == AccountStatus.ACTIVE;

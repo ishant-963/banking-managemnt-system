@@ -5,29 +5,21 @@ import com.javabank.model.Account;
 import com.javabank.model.Admin;
 import com.javabank.model.Customer;
 import com.javabank.service.AccountService;
-import com.javabank.service.CustomerService;
-import com.javabank.service.InterestService;
 import com.javabank.service.LoanService;
 import com.javabank.service.ReportService;
 import com.javabank.service.TransactionService;
 import com.javabank.util.ConsoleUtil;
-import com.javabank.util.InputHelper;
-import com.javabank.util.MoneyFormatter;
 import com.javabank.util.TablePrinter;
 
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Map;
 
 public class AdminMenu {
 
     private Admin admin;
 
-    private CustomerService customerService = new CustomerService();
     private AccountService accountService = new AccountService();
     private TransactionService transactionService = new TransactionService();
     private LoanService loanService = new LoanService();
-    private InterestService interestService = new InterestService();
     private ReportService reportService = new ReportService();
 
     public AdminMenu(Admin admin) {
@@ -52,7 +44,7 @@ public class AdminMenu {
             System.out.println("10. Bank summary report");
             System.out.println(" 0. Logout");
 
-            int choice = InputHelper.readInt("\nEnter your choice: ");
+            int choice = ConsoleUtil.readInt("\nEnter your choice: ");
             switch (choice) {
                 case 1:
                     viewCustomers();
@@ -97,7 +89,7 @@ public class AdminMenu {
     private void viewCustomers() {
         try {
             System.out.println();
-            System.out.print(TablePrinter.customerTable(customerService.getAllCustomers()));
+            System.out.print(TablePrinter.customerTable(accountService.getAllCustomers()));
         } catch (BankException e) {
             ConsoleUtil.error(e.getMessage());
         }
@@ -113,10 +105,10 @@ public class AdminMenu {
     }
 
     private void searchAccount() {
-        int accNo = InputHelper.readInt("Account number: ");
+        int accNo = ConsoleUtil.readInt("Account number: ");
         try {
             Account account = accountService.getAccount(accNo);
-            Customer owner = customerService.getCustomer(account.getCustomerId());
+            Customer owner = accountService.getCustomer(account.getCustomerId());
 
             ArrayList<Account> single = new ArrayList<>();
             single.add(account);
@@ -132,7 +124,7 @@ public class AdminMenu {
     }
 
     private void freezeAccount() {
-        int accNo = InputHelper.readInt("Account number to freeze: ");
+        int accNo = ConsoleUtil.readInt("Account number to freeze: ");
         try {
             accountService.freezeAccount(accNo);
             ConsoleUtil.success("Account " + accNo + " is now frozen.");
@@ -142,7 +134,7 @@ public class AdminMenu {
     }
 
     private void unfreezeAccount() {
-        int accNo = InputHelper.readInt("Account number to unfreeze: ");
+        int accNo = ConsoleUtil.readInt("Account number to unfreeze: ");
         try {
             accountService.unfreezeAccount(accNo);
             ConsoleUtil.success("Account " + accNo + " is active again.");
@@ -152,8 +144,8 @@ public class AdminMenu {
     }
 
     private void closeAccount() {
-        int accNo = InputHelper.readInt("Account number to close: ");
-        if (!InputHelper.confirm("Closing an account cannot be undone. Continue?")) {
+        int accNo = ConsoleUtil.readInt("Account number to close: ");
+        if (!ConsoleUtil.confirm("Closing an account cannot be undone. Continue?")) {
             ConsoleUtil.info("Cancelled.");
             return;
         }
@@ -166,31 +158,30 @@ public class AdminMenu {
     }
 
     private void applyInterest() {
-        if (!InputHelper.confirm("Credit this month's interest to all savings accounts?")) {
+        if (!ConsoleUtil.confirm("Credit this month's interest to all savings accounts?")) {
             ConsoleUtil.info("Cancelled.");
             return;
         }
         try {
-            HashMap<Integer, Double> credited = interestService.applyMonthlyInterest();
-            if (credited.isEmpty()) {
+            ArrayList<String> lines = transactionService.applyMonthlyInterest();
+            if (lines.isEmpty()) {
                 ConsoleUtil.info("Nothing to credit (interest may already be paid for this month).");
                 return;
             }
 
-            double total = 0;
-            for (Map.Entry<Integer, Double> entry : credited.entrySet()) {
-                System.out.println("  Account " + entry.getKey() + " -> " + MoneyFormatter.format(entry.getValue()));
-                total += entry.getValue();
+            int count = lines.size() - 1;
+            for (int i = 0; i < count; i++) {
+                System.out.println(lines.get(i));
             }
-            ConsoleUtil.success("Interest credited to " + credited.size() + " account(s), total "
-                    + MoneyFormatter.format(total));
+            String totalText = lines.get(count).replace("TOTAL:", "");
+            ConsoleUtil.success("Interest credited to " + count + " account(s), total " + totalText);
         } catch (BankException e) {
             ConsoleUtil.error(e.getMessage());
         }
     }
 
     private void recentTransactions() {
-        int count = InputHelper.readInt("How many recent transactions to show: ");
+        int count = ConsoleUtil.readInt("How many recent transactions to show: ");
         try {
             System.out.println();
             System.out.print(TablePrinter.transactionTable(transactionService.getRecentTransactions(count)));

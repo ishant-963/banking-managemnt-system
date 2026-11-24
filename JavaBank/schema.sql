@@ -58,4 +58,4 @@ CREATE TABLE IF NOT EXISTS admins (
 
 -- default admin login -> username: admin   password: admin123
 INSERT IGNORE INTO admins (username, password_hash)
-VALUES ('admin', '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9');
+VALUES ('admin', 'admin123');
